@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vice City Nights — an open-world crime game</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23ff7a2f'/%3E%3Ctext x='16' y='22' font-size='18' text-anchor='middle' fill='white'%3EV%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="./style.css">
+</head>
+<body>
+<canvas id="game" aria-label="Vice City Nights: drive and walk around Port Meridian, steal cars, dodge the police and run missions"></canvas>
+<p id="status" role="status" aria-live="polite"></p>
+
+<div id="hud">
+  <div id="hud-top">
+    <div id="hud-left" class="panel">
+      <div id="health-row"><span>HP</span><div id="health-bar"><div id="health-fill"></div></div><span id="health-text">100</span></div>
+      <div id="stars">☆☆☆☆☆</div>
+      <div id="cash-row"><span id="cash">$0</span><span id="score">Missions 0/4</span></div>
+    </div>
+    <div id="objective" class="panel">Port Meridian</div>
+    <div id="hud-right">
+      <canvas id="minimap" width="220" height="173"></canvas>
+      <div id="speed" class="panel">0 mph</div>
+      <div id="ammo" class="panel">Ammo 24</div>
+    </div>
+  </div>
+  <div id="hud-bottom">WASD drive / walk · E enter car · Space punch / handbrake · F shoot · M mute · Esc pause</div>
+  <div id="banner" class="panel" style="display:none"><div id="banner-title"></div><div id="banner-sub"></div></div>
+</div>
+<div id="vignette"></div>
+<button id="btn-mute">🔊 Sound</button>
+
+<div id="title-screen" class="overlay" style="display:none">
+  <div class="card">
+    <h1>VICE CITY NIGHTS</h1>
+    <div class="tag">Port Meridian — one driver, one crew, one last shot at the big score.</div>
+    <p>You are <b>Vic</b>, a courier-driver for a small crew. Steal cars, outrun the
+    police, run the packages, and pull off the Meridian Bank job — before the
+    city swallows you whole.</p>
+    <div class="controls">
+      <b>WASD / arrows</b> — walk &amp; drive &nbsp;·&nbsp; <b>E</b> — enter / exit car, grab cash<br>
+      <b>Space</b> — punch (on foot) / handbrake (in car) &nbsp;·&nbsp; <b>F</b> / right-click — shoot<br>
+      <b>M</b> — mute &nbsp;·&nbsp; <b>Esc</b> — pause &nbsp;·&nbsp; Click — punch toward the cursor
+    </div>
+    <br>
+    <button id="btn-start" class="btn">▶ START</button>
+    <button id="btn-continue" class="btn ghost" style="display:none">CONTINUE</button>
+    <p style="font-size:12.5px; color:#c9a87a;">An original game. No real city, no real people — everything drawn and written for this entry.</p>
+  </div>
+</div>
+
+<div id="pause-screen" class="overlay" style="display:none">
+  <div class="card">
+    <h2>PAUSED</h2>
+    <p>Port Meridian waits for no one. Well — right now it does.</p>
+    <button id="btn-resume" class="btn">RESUME</button>
+    <button id="btn-restart" class="btn ghost">RESTART</button>
+  </div>
+</div>
+
+<div id="busted-screen" class="overlay" style="display:none">
+  <div class="card">
+    <h2>🚨 BUSTED</h2>
+    <p>The Port Meridian PD finally caught up with Vic.</p>
+    <div id="busted-stats" class="stats"></div>
+    <button id="btn-busted" class="btn">WAKE UP AT THE SAFEHOUSE</button>
+  </div>
+</div>
+
+<div id="story-screen" class="overlay" style="display:none">
+  <div class="card">
+    <h2>🏆 STORY COMPLETE</h2>
+    <p>All four jobs done. The Meridian Bank money is in the crew's hands, the
+    heat is off, and Vic is a legend on the streets of Port Meridian.</p>
+    <div id="story-stats" class="stats"></div>
+    <button id="btn-story" class="btn">KEEP DRIVING (FREE ROAM)</button>
+    <button id="btn-again" class="btn ghost">PLAY AGAIN</button>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
