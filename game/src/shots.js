@@ -1,8 +1,11 @@
 // Deterministic showcase states for the screenshots (?shot=1..4). Each one
-// sets real game state — no fake renders — then the shot is taken.
+// sets real game state — no fake renders — then the shot is taken. The view
+// is third-person, so every shot frames the player from behind with the
+// road and the city ahead; the camera is snapped to the player at the end.
 import { createCar } from './vehicles.js';
 import { startMission } from './missions.js';
 import { showOverlay, updateHUD } from './hud.js';
+import { snapCamera3p } from './render3p.js';
 
 // Put the player in a car of `type` at (x, y), facing `angle`, moving.
 function putPlayerInCar(state, type, x, y, angle, speed) {
@@ -12,7 +15,6 @@ function putPlayerInCar(state, type, x, y, angle, speed) {
   const pl = state.player;
   pl.car = car; pl.onFoot = false; pl.carHealth = car.health;
   pl.x = x; pl.y = y; pl.angle = angle; pl.speed = speed;
-  state.cam.x = x; state.cam.y = y;
   return car;
 }
 
@@ -35,34 +37,40 @@ export function applyShot(state, n) {
   state.dusk = false;
   state.banner = null;
   if (n === 1) {
-    // Driving a sports car through downtown, traffic around, wanted 0.
-    putPlayerInCar(state, 'sports', 1680, 660, 0, 260);
+    // Driving a sports car east through downtown on the y=720 road, traffic
+    // around, wanted 0. The camera sits behind the car, buildings lining
+    // both sides of the road ahead, the package marker straight ahead.
+    putPlayerInCar(state, 'sports', 1200, 720, Math.PI / 2, 260);
     state.missionsDone = 1;
     startMission(state, 1);
     state.mission.step = 0;
     state.banner = null;
     state.player.cash = 200;
   } else if (n === 2) {
-    // On foot near the Crew Garage marker, pedestrians about, mission 1.
+    // On foot, facing east down the road toward the Crew Garage marker.
+    // The camera is behind Vic, the garage circle and the marker ahead.
     pl.car = null; pl.onFoot = true;
-    pl.x = 690; pl.y = 1150; pl.angle = Math.PI / 2;
-    state.cam.x = 720; state.cam.y = 1200;
+    pl.x = 640; pl.y = 1200; pl.angle = Math.PI / 2;
     state.missionsDone = 0;
     startMission(state, 0);
     state.banner = null;
     pl.cash = 0;
   } else if (n === 3) {
-    // Police chase at 3 stars: player in a sedan, three interceptors behind.
-    const car = putPlayerInCar(state, 'sedan', 1680, 1200, 0, 300);
+    // Police chase at 3 stars: Vic in a sedan heading north, interceptors
+    // flanking and a roadblock ahead. The interceptors are parked in place
+    // for the shot (not in state.police, so the chase AI does not drive
+    // them into a pile-up on the camera): the player coasts ~260 units
+    // north in the 1.2 s before the screenshot, so they are placed for
+    // where Vic will be — flankers just ahead of him, roadblock further up.
+    putPlayerInCar(state, 'sedan', 1680, 1200, 0, 300);
     state.wanted = 3;
     state.lastCrimeT = state.time;
-    for (let i = 0; i < 3; i++) {
-      // Spread across the lanes, staggered behind the player.
-      const pc = createCar('police', 1680 + (i - 1) * 95, 1350 + i * 55, 0, 'police');
-      pc.speed = 280;
-      state.cars.push(pc);
-      state.police.push(pc);
-    }
+    const flankL = createCar('police', 1640, 750, 0, 'parked');
+    const flankR = createCar('police', 1720, 750, 0, 'parked');
+    const block = createCar('police', 1680, 500, Math.PI, 'parked');
+    for (const pc of [flankL, flankR, block]) state.cars.push(pc);
+    // (The live police still spawn from the edge for the minimap/wanted;
+    // they are too far to reach the frame in time.)
     state.missionsDone = 3;
     startMission(state, 3);
     state.mission.step = 2;
@@ -84,6 +92,9 @@ export function applyShot(state, n) {
     updateHUD(state);
     showOverlay(state, 'story');
   }
+  // Frame the camera behind the player right now (no easing on the first
+  // frame), so the screenshot shows the intended third-person view.
+  snapCamera3p(state);
   // Keep the objective text and mission marker in sync for the HUD/minimap.
   // (Shot 4 sets its own objective text above and has no active mission.)
   if (state.mission) {

@@ -124,8 +124,12 @@ export function nearestRoadPoint(city, x, y) {
   return Math.abs(x - bx) < Math.abs(y - by) ? { x: bx, y } : { x, y: by };
 }
 
-// The whole static city, painted once to an offscreen canvas.
-export function drawCityLayer(city) {
+// The whole static city, painted once to an offscreen canvas. With
+// opts.flat, building roofs and trees are left out: the third-person
+// renderer draws those as billboards, so the ground layer is only the
+// streets, grass, parks, beach and water.
+export function drawCityLayer(city, opts) {
+  const flat = !!(opts && opts.flat);
   const c = document.createElement('canvas');
   c.width = WORLD_W; c.height = WORLD_H;
   const g = c.getContext('2d');
@@ -168,6 +172,7 @@ export function drawCityLayer(city) {
     g.beginPath(); g.ellipse(p.x + p.w / 2, p.y + p.h / 2, 10, p.h / 3, 0, 0, Math.PI * 2); g.fill();
   }
   for (const t of city.trees) {
+    if (flat) break;
     g.fillStyle = 'rgba(0,0,0,0.18)';
     g.beginPath(); g.ellipse(t.x + 5, t.y + 6, t.r, t.r * 0.8, 0, 0, Math.PI * 2); g.fill();
     g.fillStyle = t.c;
@@ -176,7 +181,7 @@ export function drawCityLayer(city) {
     g.beginPath(); g.arc(t.x - t.r * 0.3, t.y - t.r * 0.3, t.r * 0.4, 0, Math.PI * 2); g.fill();
   }
   // Buildings with a long sunset shadow and a roof.
-  for (const b of city.buildings) {
+  if (!flat) for (const b of city.buildings) {
     const sh = 6 + b.height * 5;
     g.fillStyle = 'rgba(40,20,10,0.30)';
     g.fillRect(b.x + sh, b.y + sh, b.w, b.h);

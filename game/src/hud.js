@@ -76,10 +76,11 @@ export function drawMinimap(state) {
   ctx.beginPath(); ctx.moveTo(0, -6); ctx.lineTo(4.5, 5); ctx.lineTo(-4.5, 5); ctx.closePath(); ctx.fill();
   ctx.strokeStyle = '#111'; ctx.lineWidth = 1; ctx.stroke();
   ctx.restore();
-  // Viewport rectangle.
+  // Viewport rectangle, centred on the player (the third-person camera
+  // sits behind them, so the visible area is around the player).
   const vw = state.view.w * s, vh = state.view.h * s;
   ctx.strokeStyle = 'rgba(255,255,255,0.6)'; ctx.lineWidth = 1;
-  ctx.strokeRect((state.cam.x - state.view.w / 2) * s, (state.cam.y - state.view.h / 2) * s, vw, vh);
+  ctx.strokeRect((state.player.x - state.view.w / 2) * s, (state.player.y - state.view.h / 2) * s, vw, vh);
 }
 
 export function showOverlay(state, name) {

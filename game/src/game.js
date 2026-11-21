@@ -1,13 +1,16 @@
 // Vice City Nights — game state, input, the main loop and rendering.
 // Orchestrates city, vehicles, traffic, police, missions, combat, HUD, audio.
+// The view is third-person (see render3p.js): the camera sits behind and
+// above the player and the world is drawn in perspective.
 import { createCity, drawCityLayer, mulberry32, WORLD_W, WORLD_H, BEACH_TOP, resolveCircleVsBuildings, isWater, onRoad } from './city.js';
-import { createCar, updateCarDrive, drawCar, CAR_TYPES } from './vehicles.js';
-import { spawnTraffic, spawnPedestrians, updateTraffic, updatePedestrians, drawPedestrian, nearestCar } from './traffic.js';
+import { createCar, updateCarDrive, CAR_TYPES } from './vehicles.js';
+import { spawnTraffic, spawnPedestrians, updateTraffic, updatePedestrians, nearestCar } from './traffic.js';
 import { addWanted, crimePulse, updateWanted, updatePolice } from './police.js';
 import { MISSIONS, startMission, updateMissions, missionObjectiveText, missionMarker, saveProgress, loadSave } from './missions.js';
-import { punch, shoot, spawnAmmoPickups, updatePickups, drawPickups } from './combat.js';
+import { punch, shoot, spawnAmmoPickups, updatePickups } from './combat.js';
 import { updateHUD, showOverlay, hideOverlays } from './hud.js';
 import { createAudio } from './audio.js';
+import { renderGame3p, updateCamera3p, createCamera3p, snapCamera3p } from './render3p.js';
 
 export function createGame(canvas) {
   const city = createCity(1337);
@@ -25,12 +28,15 @@ export function createGame(canvas) {
     mission: null, missionsDone: 0, failedMission: undefined, nextMissionT: 2,
     storyDone: false, bestEscape: 0, banner: null, events: [],
     objectiveText: '', missionMarker: null,
-    cam: { x: 660, y: 1140 }, view: { w: 1280, h: 800 },
+    cam: { x: 660, y: 1140 }, cam3: null, view3: null, view: { w: 1280, h: 800 },
     keys: new Set(), interactPressed: false, dusk: false,
     audio: createAudio(), hudEls: null, cityLayer: null,
     save: loadSave(), lastPoliceSpawn: 0, lastOfficerSpawn: 0, hudFlash: 0,
   };
-  state.cityLayer = drawCityLayer(city);
+  // Flat ground layer (no building roofs, no trees — the third-person
+  // renderer draws those as billboards).
+  state.cityLayer = drawCityLayer(city, { flat: true });
+  state.cam3 = createCamera3p(state);
   // Starting cars: a few parked near the garage, some traffic, pedestrians.
   const starter = createCar('sedan', 660, 1290, 0, 'parked');
   state.cars.push(starter);
@@ -203,10 +209,8 @@ export function updateGame(state, dt) {
     state.skids[i].life -= dt;
     if (state.skids[i].life <= 0) state.skids.splice(i, 1);
   }
-  // Camera follows the player.
-  const tx = state.player.x, ty = state.player.y;
-  state.cam.x += (tx - state.cam.x) * Math.min(1, dt * 5);
-  state.cam.y += (ty - state.cam.y) * Math.min(1, dt * 5);
+  // Third-person chase camera follows the player.
+  updateCamera3p(state, dt);
   state.objectiveText = missionObjectiveText(state);
   state.missionMarker = missionMarker(state);
   processEvents(state);
@@ -214,93 +218,9 @@ export function updateGame(state, dt) {
 }
 
 export function renderGame(state) {
-  const ctx = state.ctx;
-  const vw = state.view.w, vh = state.view.h;
-  const cx = state.cam.x - vw / 2, cy = state.cam.y - vh / 2;
-  ctx.clearRect(0, 0, vw, vh);
-  // Static city layer (only the visible window).
-  ctx.drawImage(state.cityLayer, cx, cy, vw, vh, 0, 0, vw, vh);
-  ctx.save();
-  ctx.translate(-cx, -cy);
-  // Skid marks.
-  ctx.strokeStyle = 'rgba(20,20,25,0.5)'; ctx.lineWidth = 5; ctx.lineCap = 'round';
-  for (const s of state.skids) {
-    ctx.globalAlpha = Math.min(1, s.life / 4) * 0.7;
-    ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
-  }
-  ctx.globalAlpha = 1;
-  drawPickups(ctx, state, state.time);
-  // Mission marker: pulsing ring + diamond.
-  const mk = state.missionMarker;
-  if (mk) {
-    const pulse = 46 + Math.sin(state.time * 5) * 8;
-    ctx.strokeStyle = '#ffd23b'; ctx.lineWidth = 4;
-    ctx.beginPath(); ctx.arc(mk.x, mk.y, pulse, 0, Math.PI * 2); ctx.stroke();
-    ctx.fillStyle = '#ffd23b';
-    ctx.save(); ctx.translate(mk.x, mk.y - 30 - Math.sin(state.time * 3) * 5); ctx.rotate(Math.PI / 4);
-    ctx.fillRect(-9, -9, 18, 18); ctx.restore();
-  }
-  // Cars (police drawn with the rest).
-  for (const car of state.cars) drawCar(ctx, car, state.time);
-  // Pedestrians, then the player on foot.
-  for (const p of state.peds) drawPedestrian(ctx, p, state.time);
-  if (state.player.onFoot) drawPlayer(ctx, state);
-  // Particles.
-  for (const p of state.particles) {
-    const a = Math.max(0, p.life / p.max);
-    ctx.globalAlpha = a;
-    ctx.fillStyle = p.color;
-    if (p.star) {
-      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(state.time * 3);
-      ctx.fillRect(-p.size, -2, p.size * 2, 4);
-      ctx.fillRect(-2, -p.size, 4, p.size * 2);
-      ctx.restore();
-    } else {
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * a + 1, 0, Math.PI * 2); ctx.fill();
-    }
-  }
-  ctx.globalAlpha = 1;
-  ctx.restore();
-  // Warm sunset wash + vignette (stronger at dusk).
-  const warm = state.dusk ? 0.30 : 0.10;
-  const grad = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.35, vw / 2, vh / 2, Math.max(vw, vh) * 0.75);
-  grad.addColorStop(0, 'rgba(255,170,80,0)');
-  grad.addColorStop(1, `rgba(255,120,40,${warm})`);
-  ctx.fillStyle = grad; ctx.fillRect(0, 0, vw, vh);
-  const vig = ctx.createRadialGradient(vw / 2, vh / 2, Math.min(vw, vh) * 0.45, vw / 2, vh / 2, Math.max(vw, vh) * 0.72);
-  vig.addColorStop(0, 'rgba(0,0,0,0)');
-  vig.addColorStop(1, 'rgba(20,10,0,0.35)');
-  ctx.fillStyle = vig; ctx.fillRect(0, 0, vw, vh);
-}
-
-function drawPlayer(ctx, state) {
-  const pl = state.player;
-  const bob = pl.speed > 0 ? Math.sin(state.time * 12) * 1.5 : 0;
-  ctx.save();
-  ctx.translate(pl.x, pl.y + bob * 0.3);
-  ctx.fillStyle = 'rgba(40,20,10,0.30)';
-  ctx.beginPath(); ctx.ellipse(3, 5, 11, 7, 0, 0, Math.PI * 2); ctx.fill();
-  // Body (orange jacket) + head.
-  ctx.fillStyle = '#ff7a2f';
-  ctx.beginPath(); ctx.arc(0, 0, 11, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#f0c8a0';
-  ctx.beginPath(); ctx.arc(0, -2, 6.5, 0, Math.PI * 2); ctx.fill();
-  ctx.fillStyle = '#2b2b2b';
-  ctx.beginPath(); ctx.arc(0, -4, 6, Math.PI, 0); ctx.fill();
-  // Facing tick + punch / muzzle.
-  ctx.rotate(pl.angle);
-  ctx.fillStyle = '#ff7a2f';
-  ctx.fillRect(-3.5, -17, 7, 8);
-  if (pl.punchAnim > 0) {
-    ctx.fillStyle = '#ffe9a8';
-    ctx.beginPath(); ctx.arc(0, -26, 8, 0, Math.PI * 2); ctx.fill();
-  }
-  if (pl.muzzle > 0) {
-    ctx.fillStyle = '#ffe9a8';
-    ctx.beginPath();
-    ctx.moveTo(0, -20); ctx.lineTo(-6, -34); ctx.lineTo(6, -34); ctx.closePath(); ctx.fill();
-  }
-  ctx.restore();
+  // Third-person view: the camera sits behind and above the player and the
+  // world is drawn in perspective (Mode 7 ground + billboards).
+  renderGame3p(state);
 }
 
 // --- Input + flow ---------------------------------------------------------
@@ -341,10 +261,15 @@ export function bindInput(state) {
   canvas.addEventListener('mousedown', (e) => {
     state.audio.init(); state.audio.resume();
     if (state.mode !== 'play' || !state.player.onFoot) return;
+    // Third-person aim: a click at screen x is a ray at that horizontal
+    // angle from the camera heading — face along it.
     const r = canvas.getBoundingClientRect();
-    const wx = state.cam.x - state.view.w / 2 + (e.clientX - r.left);
-    const wy = state.cam.y - state.view.h / 2 + (e.clientY - r.top);
-    state.player.angle = Math.atan2(wx - state.player.x, -(wy - state.player.y));
+    const sx = e.clientX - r.left;
+    const v = state.view3;
+    if (v) {
+      const rel = Math.atan2(sx - v.vw / 2, v.f);
+      state.player.angle = state.cam3.heading + rel;
+    }
     if (e.button === 0) punch(state);
     else if (e.button === 2) shoot(state);
   });
@@ -388,7 +313,7 @@ export function respawn(state) {
   pl.x = sh.x; pl.y = sh.y; pl.angle = 0;
   pl.car = null; pl.onFoot = true;
   state.wanted = 0; state.decayT = 0;
-  state.cam.x = pl.x; state.cam.y = pl.y;
+  snapCamera3p(state);
   state.mode = 'play';
   hideOverlays(state);
   saveProgress(state);

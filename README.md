@@ -7,15 +7,19 @@
 An original open-world crime game for the
 [make.fun bounty "Make GTA 6"](https://make.fun/bounty/gta6-01).
 You are **Vic**, a courier-driver for a small crew in the city of
-**Port Meridian**. Explore a seeded city on foot and by car, steal cars,
+**Port Meridian**. Explore a seeded city on foot and by car in a
+**third-person view** — the camera sits behind you and the streets,
+traffic and skyline stretch ahead in perspective — steal cars,
 outrun the police, and run four story missions — from your first stolen
 wheels to the Meridian Bank job.
 
 ## The game
 
 - **A city to explore** — a deterministic seeded grid of roads, blocks,
-  buildings, parks and a beachfront, drawn procedurally on canvas; the
-  camera follows you, with a warm sunset wash and long shadows
+  buildings, parks and a beachfront, drawn procedurally on canvas and
+  rendered in third-person perspective (Mode 7 ground, buildings, cars
+  and people as billboards); the chase camera follows behind you, with a
+  warm sunset wash and long shadows
 - **On foot and by car** — walk and run, or press E to take any car:
   sedans, taxis, sports cars, trucks and police interceptors, each with
   its own speed and handling
